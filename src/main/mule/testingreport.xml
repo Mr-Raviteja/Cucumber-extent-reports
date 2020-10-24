@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="7561e3de-3c7e-471c-b3f7-17247ac2050b" >
+		<db:my-sql-connection host="${mysql.host}" port="${mysql.port}" user="${mysql.user}" password="${mysql.password}" database="${mysql.database}" />
+	</db:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="d5e3f879-b4e0-4c67-80e2-b21abd057823" file="mytrains.user.sys.api.dev.yaml" />
+	<http:listener-config name="HTTP_Listener_config1" doc:name="HTTP Listener config" doc:id="06cff1e6-90c0-4431-a6c7-ffa35b3adc39">
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="createUser" doc:id="b3287fcc-5b1c-4730-87d1-4f0609fbfcb3" >
+		<http:listener doc:name="Listener" doc:id="cf3b1f17-6477-43e1-b57b-373b865d57c2" config-ref="HTTP_Listener_config1" path="/api/users/registrations" allowedMethods="POST">
+			<http:response statusCode="#[201]" />
+		</http:listener>
+		<db:insert doc:id="87655f1f-bb64-41d0-81d0-a34d08edf3bf" config-ref="Database_Config" queryTimeout="5000">
+			<db:sql ><![CDATA[INSERT INTO `trains`.`customers`
+(`userId`,
+`firstName`,
+`lastName`,
+`email`,
+`phone`)
+VALUES
+(:userId,
+:firstName,
+:lastName,
+:email,
+:phone )]]></db:sql>
+			<db:input-parameters ><![CDATA[#[%dw 2.0
+ --- 
+{
+"userId": payload.userId,
+"firstName": payload.firstName,
+"lastName": payload.lastName,
+"email": payload.emailId,
+"phone": payload.phone}]]]></db:input-parameters>
+		</db:insert>
+		<ee:transform doc:name="Transform Message" doc:id="ec61b842-1a64-4d22-a3d9-346f7bbdd2b9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "Data inserted successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="9f4a51e8-3b4d-43b8-83bf-8ceec478cd63" message="#[payload]"/>
+	
+</flow>
+<flow name="getUserbyId" doc:id="4c945746-6ac2-4315-bd5a-5fa6ca4eb932" >
+		<http:listener doc:name="Listener" doc:id="66a344ef-810b-4f94-a2f6-8ef54779618c" config-ref="HTTP_Listener_config1" path="/api/users/user/{userId}"/>
+		<set-variable value="#[message.attributes.uriParams.userId]" doc:name="Set Variable" doc:id="275caaac-af9c-47f3-a9ef-7635fd98158f" variableName="userId" />
+		<db:select doc:name="Select" doc:id="da9e2e78-9d38-4043-97e5-fb99bfa4db64" config-ref="Database_Config">
+			<db:sql><![CDATA[SELECT * FROM customers where userId=:userId]]></db:sql>
+			<db:input-parameters><![CDATA[#["userId": vars.userId]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="6d81edd5-5807-411b-bae1-157b8842b4eb">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	userId: payload01.userId,
+	firstName: payload01.firstName,
+	lastName: payload01.lastName,
+	phone: payload01.phone,
+	emailId: payload01.email,
+	
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="91b80f3a-468d-4c29-bced-d59f69371a25" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload reduce (user,accum)-> accum]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	
+	</mule>

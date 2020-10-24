@@ -22,7 +22,7 @@ public class TestRunner {
 	
 	@AfterClass
     public static void writeExtentReport() {
-        Reporter.loadXMLConfig(new File("src/test/java/config/extent_report-config.xml"));
+        Reporter.loadXMLConfig(new File("src/test/resources/config/extent_report-config.xml"));
     
     }
 }
